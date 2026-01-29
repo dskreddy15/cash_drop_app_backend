@@ -25,8 +25,12 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     // Allow localhost on any port for development
-    if (origin.match(/^http:\/\/localhost:\d+$/) || 
-        origin.match(/^http:\/\/127\.0\.0\.1:\d+$/)) {
+    //if (origin.match(/^http:\/\/localhost:\d+$/) || 
+      //  origin.match(/^http:\/\/127\.0\.0\.1:\d+$/)) {
+      //return callback(null, true);
+    //}
+
+    if (origin.match(process.env.REACT_APP_URL)) {
       return callback(null, true);
     }
     
