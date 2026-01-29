@@ -30,7 +30,7 @@ const corsOptions = {
       //return callback(null, true);
     //}
 
-    if (origin.match(process.env.REACT_APP_URL)) {
+    if (origin.match(/^https:\/\/" + process.env.REACT_APP_URL + "\d+$/)) {
       return callback(null, true);
     }
     
