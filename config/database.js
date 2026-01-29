@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+  password: process.env.DB_PASSWORD || 'dskreddy98',
   database: process.env.DB_NAME || 'cash_drop_db',
   waitForConnections: true,
   connectionLimit: 10,
@@ -160,6 +160,7 @@ const initDatabase = async () => {
         admin_count_amount DECIMAL(10, 2) DEFAULT 0.00,
         is_reconciled TINYINT(1) DEFAULT 0,
         reconcile_delta DECIMAL(10, 2) DEFAULT 0.00,
+        notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (drop_entry_id) REFERENCES cash_drops(id) ON DELETE CASCADE
@@ -178,6 +179,23 @@ const initDatabase = async () => {
       
       if (columns.length === 0) {
         await connection.query(`ALTER TABLE cash_drop_reconcilers ADD COLUMN reconcile_delta DECIMAL(10, 2) DEFAULT 0.00`);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    // Add notes column if it doesn't exist
+    try {
+      const [columns] = await connection.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = ? 
+        AND TABLE_NAME = 'cash_drop_reconcilers' 
+        AND COLUMN_NAME = 'notes'
+      `, [dbConfig.database]);
+      
+      if (columns.length === 0) {
+        await connection.query(`ALTER TABLE cash_drop_reconcilers ADD COLUMN notes TEXT`);
       }
     } catch (e) {
       // Ignore errors

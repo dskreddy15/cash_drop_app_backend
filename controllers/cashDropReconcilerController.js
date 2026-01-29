@@ -34,7 +34,7 @@ export const getCashDropReconcilers = async (req, res) => {
 export const updateCashDropReconciler = async (req, res) => {
   try {
     const { id } = req.body;
-    const { admin_count_amount, is_reconciled } = req.body;
+    const { admin_count_amount, is_reconciled, notes } = req.body;
     
     if (!id) {
       return res.status(400).json({ error: 'ID is required' });
@@ -49,7 +49,8 @@ export const updateCashDropReconciler = async (req, res) => {
     // If unreconciling (setting is_reconciled to false)
     if (is_reconciled === false) {
       const updated = await CashDropReconciler.update(id, {
-        is_reconciled: false
+        is_reconciled: false,
+        notes: null // Clear notes when unreconciling
       });
       
       // Add image URL if present
@@ -76,18 +77,21 @@ export const updateCashDropReconciler = async (req, res) => {
     const adminCounted = parseFloat(admin_count_amount || 0);
     const systemDrop = parseFloat(dropEntry.drop_amount);
     
-    // Note: Counted Amount may or may not be same as Cash Drop Amount
-    // We allow differences and capture them in reconcile_delta
-    
     // Calculate reconcile delta (difference between counted and system drop)
     const reconcileDelta = adminCounted - systemDrop;
     
-    // Update the reconciler
-    const updated = await CashDropReconciler.update(id, {
+    // Update the reconciler with notes if provided
+    const updateData = {
       admin_count_amount: adminCounted,
       is_reconciled: true,
       reconcile_delta: reconcileDelta
-    });
+    };
+    
+    if (notes !== undefined) {
+      updateData.notes = notes || null;
+    }
+    
+    const updated = await CashDropReconciler.update(id, updateData);
     
     // Add image URL if present
     if (updated && updated.label_image) {

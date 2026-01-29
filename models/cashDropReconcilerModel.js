@@ -21,11 +21,15 @@ export const CashDropReconciler = {
     const [rows] = await pool.execute(`
       SELECT 
         cdr.*,
+        cdr.notes as reconciliation_notes,
         u.name as user_name,
         cd.drop_amount as system_drop_amount,
         cd.ws_label_amount,
         cd.variance,
-        cd.label_image
+        cd.label_image,
+        cd.notes,
+        cd.hundreds, cd.fifties, cd.twenties, cd.tens, cd.fives, cd.twos, cd.ones,
+        cd.half_dollars, cd.quarters, cd.dimes, cd.nickels, cd.pennies
       FROM cash_drop_reconcilers cdr
       JOIN cash_drops cd ON cdr.drop_entry_id = cd.id
       JOIN users u ON cd.user_id = u.id
@@ -44,12 +48,14 @@ export const CashDropReconciler = {
       SELECT 
         cdr.*,
         cdr.drop_entry_id,
+        cdr.notes as reconciliation_notes,
         u.name as user_name,
         cd.drop_amount as system_drop_amount,
         cd.ws_label_amount,
         cd.variance,
         cd.label_image,
         cd.bank_dropped,
+        cd.notes,
         cd.hundreds, cd.fifties, cd.twenties, cd.tens, cd.fives, cd.twos, cd.ones,
         cd.half_dollars, cd.quarters, cd.dimes, cd.nickels, cd.pennies,
         COALESCE(cdr.admin_count_amount, cd.drop_amount) as reconciled_amount,
@@ -98,6 +104,10 @@ export const CashDropReconciler = {
     if (data.reconcile_delta !== undefined) {
       fields.push('reconcile_delta = ?');
       values.push(data.reconcile_delta);
+    }
+    if (data.notes !== undefined) {
+      fields.push('notes = ?');
+      values.push(data.notes || null);
     }
     
     if (fields.length === 0) return null;
