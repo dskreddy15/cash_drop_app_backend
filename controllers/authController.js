@@ -51,9 +51,22 @@ export const login = async (req, res) => {
     
     const { accessToken, refreshToken } = generateTokens(user);
     
+    // Set HttpOnly cookies
+    res.cookie('access_token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000 // 60 minutes (matches ACCESS_TOKEN_LIFETIME)
+    });
+    
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours (matches REFRESH_TOKEN_LIFETIME)
+    });
+    
     res.json({
-      access: accessToken,
-      refresh: refreshToken,
       is_admin: user.is_admin === 1
     });
   } catch (error) {
@@ -242,20 +255,31 @@ export const deleteUser = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  // In a production app, you might want to blacklist the refresh token
-  // For now, we'll just return success
+  // Clear HttpOnly cookies
+  res.clearCookie('access_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  });
+  
+  res.clearCookie('refresh_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  });
+  
   res.json({ message: 'Logged out successfully' });
 };
 
 export const refreshToken = async (req, res) => {
   try {
-    const { refresh } = req.body;
+    const refreshToken = req.cookies?.refresh_token || req.body?.refresh;
     
-    if (!refresh) {
+    if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token required' });
     }
     
-    jwt.verify(refresh, JWT_SECRET, async (err, decoded) => {
+    jwt.verify(refreshToken, JWT_SECRET, async (err, decoded) => {
       if (err) {
         console.error('Refresh token verification error:', err.message);
         return res.status(403).json({ error: 'Invalid or expired refresh token' });
@@ -267,7 +291,16 @@ export const refreshToken = async (req, res) => {
       }
       
       const { accessToken } = generateTokens(user);
-      res.json({ access: accessToken });
+      
+      // Set new access token in HttpOnly cookie
+      res.cookie('access_token', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 1000 // 60 minutes
+      });
+      
+      res.json({ success: true });
     });
   } catch (error) {
     console.error('Refresh token error:', error);

@@ -66,11 +66,27 @@ const initDatabase = async () => {
         nickels INT DEFAULT 0,
         pennies INT DEFAULT 0,
         total_cash DECIMAL(10, 2) NOT NULL,
+        status ENUM('drafted', 'submitted', 'ignored') DEFAULT 'submitted',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_drawer (workstation, shift_number, date)
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+    
+    // Remove unique constraint if it exists - allow multiple drawers when one is ignored
+    try {
+      const [indexes] = await connection.query(`
+        SHOW INDEX FROM cash_drawers WHERE Key_name = 'unique_drawer'
+      `);
+      if (indexes.length > 0) {
+        await connection.query(`
+          ALTER TABLE cash_drawers DROP INDEX unique_drawer
+        `);
+        console.log('Removed unique_drawer constraint from cash_drawers table.');
+      }
+    } catch (e) {
+      // Ignore if index doesn't exist or can't be dropped
+      console.log('Could not remove unique_drawer constraint (may not exist):', e.message);
+    }
 
     // Cash Drop table
     await connection.query(`
@@ -100,12 +116,28 @@ const initDatabase = async () => {
         bank_dropped TINYINT(1) DEFAULT 0,
         notes TEXT,
         submitted_at DATETIME,
+        status ENUM('drafted', 'submitted', 'ignored') DEFAULT 'submitted',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (drawer_entry_id) REFERENCES cash_drawers(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_drop (workstation, shift_number, date)
+        FOREIGN KEY (drawer_entry_id) REFERENCES cash_drawers(id) ON DELETE CASCADE
       )
     `);
+    
+    // Remove unique constraint if it exists - allow multiple cash drops when one is ignored
+    try {
+      const [indexes] = await connection.query(`
+        SHOW INDEX FROM cash_drops WHERE Key_name = 'unique_drop'
+      `);
+      if (indexes.length > 0) {
+        await connection.query(`
+          ALTER TABLE cash_drops DROP INDEX unique_drop
+        `);
+        console.log('Removed unique_drop constraint from cash_drops table.');
+      }
+    } catch (e) {
+      // Ignore if index doesn't exist or can't be dropped
+      console.log('Could not remove unique_drop constraint (may not exist):', e.message);
+    }
     
     // Add notes and submitted_at columns if they don't exist
     try {
@@ -162,6 +194,44 @@ const initDatabase = async () => {
         await connection.query(`
           ALTER TABLE cash_drops ADD COLUMN ignored TINYINT(1) DEFAULT 0,
           ADD COLUMN ignore_reason TEXT
+        `);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    // Add status column if it doesn't exist
+    try {
+      const [columns] = await connection.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = ? 
+        AND TABLE_NAME = 'cash_drops' 
+        AND COLUMN_NAME = 'status'
+      `, [dbConfig.database]);
+      
+      if (columns.length === 0) {
+        await connection.query(`
+          ALTER TABLE cash_drops ADD COLUMN status ENUM('drafted', 'submitted', 'ignored') DEFAULT 'submitted'
+        `);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    // Add status column to cash_drawers if it doesn't exist
+    try {
+      const [columns] = await connection.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = ? 
+        AND TABLE_NAME = 'cash_drawers' 
+        AND COLUMN_NAME = 'status'
+      `, [dbConfig.database]);
+      
+      if (columns.length === 0) {
+        await connection.query(`
+          ALTER TABLE cash_drawers ADD COLUMN status ENUM('drafted', 'submitted', 'ignored') DEFAULT 'submitted'
         `);
       }
     } catch (e) {

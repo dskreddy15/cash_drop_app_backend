@@ -8,8 +8,8 @@ export const CashDrop = {
         user_id, drawer_entry_id, workstation, shift_number, date,
         drop_amount, hundreds, fifties, twenties, tens, fives, twos, ones,
         half_dollars, quarters, dimes, nickels, pennies,
-        ws_label_amount, variance, label_image, notes, submitted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ws_label_amount, variance, label_image, notes, submitted_at, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       data.user_id,
       data.drawer_entry_id || null,
@@ -33,7 +33,8 @@ export const CashDrop = {
       data.variance || 0,
       data.label_image || null,
       data.notes || null,
-      data.submitted_at || getPSTDateTime()
+      data.submitted_at || getPSTDateTime(),
+      data.status || 'submitted'
     ]);
     
     return CashDrop.findById(result.insertId);
@@ -51,7 +52,8 @@ export const CashDrop = {
       return {
         ...rows[0],
         ignored: rows[0].ignored === 1,
-        bank_dropped: rows[0].bank_dropped === 1
+        bank_dropped: rows[0].bank_dropped === 1,
+        status: rows[0].status || (rows[0].ignored === 1 ? 'ignored' : 'submitted')
       };
     }
     return null;
@@ -78,7 +80,8 @@ export const CashDrop = {
     return rows.map(row => ({
       ...row,
       ignored: row.ignored === 1,
-      bank_dropped: row.bank_dropped === 1
+      bank_dropped: row.bank_dropped === 1,
+      status: row.status || (row.ignored === 1 ? 'ignored' : 'submitted')
     }));
   },
 
@@ -98,6 +101,10 @@ export const CashDrop = {
     });
     
     // Update other fields
+    if (data.user_id !== undefined) {
+      fields.push('user_id = ?');
+      values.push(data.user_id);
+    }
     if (data.drop_amount !== undefined) {
       fields.push('drop_amount = ?');
       values.push(data.drop_amount);
@@ -114,12 +121,58 @@ export const CashDrop = {
       fields.push('ignore_reason = ?');
       values.push(data.ignore_reason);
     }
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.drawer_entry_id !== undefined) {
+      fields.push('drawer_entry_id = ?');
+      values.push(data.drawer_entry_id);
+    }
+    if (data.ws_label_amount !== undefined) {
+      fields.push('ws_label_amount = ?');
+      values.push(data.ws_label_amount);
+    }
+    if (data.variance !== undefined) {
+      fields.push('variance = ?');
+      values.push(data.variance);
+    }
+    if (data.label_image !== undefined) {
+      fields.push('label_image = ?');
+      values.push(data.label_image);
+    }
+    if (data.notes !== undefined) {
+      fields.push('notes = ?');
+      values.push(data.notes);
+    }
+    if (data.submitted_at !== undefined) {
+      fields.push('submitted_at = ?');
+      values.push(data.submitted_at);
+    }
     
     if (fields.length === 0) return null;
     
     values.push(id);
     await pool.execute(`UPDATE cash_drops SET ${fields.join(', ')} WHERE id = ?`, values);
     return CashDrop.findById(id);
+  },
+
+  delete: async (id) => {
+    const [result] = await pool.execute('DELETE FROM cash_drops WHERE id = ?', [id]);
+    return result.affectedRows > 0;
+  },
+
+  findByWorkstationShiftDateStatus: async (workstation, shiftNumber, date, status = 'drafted') => {
+    const [rows] = await pool.execute(`
+      SELECT cd.*, u.name as user_name
+      FROM cash_drops cd
+      JOIN users u ON cd.user_id = u.id
+      WHERE cd.workstation = ? AND cd.shift_number = ? AND cd.date = ? AND cd.status = ?
+      ORDER BY cd.created_at DESC
+      LIMIT 1
+    `, [workstation, shiftNumber, date, status]);
+    
+    return rows[0] || null;
   },
 
   countByUserAndDate: async (userId, date) => {
@@ -129,5 +182,29 @@ export const CashDrop = {
       WHERE user_id = ? AND date = ? AND ignored = 0
     `, [userId, date]);
     return rows[0].count;
+  },
+
+  findByWorkstationShiftDate: async (workstation, shiftNumber, date) => {
+    const [rows] = await pool.execute(`
+      SELECT cd.*, u.name as user_name
+      FROM cash_drops cd
+      JOIN users u ON cd.user_id = u.id
+      WHERE cd.workstation = ? AND cd.shift_number = ? AND cd.date = ?
+      LIMIT 1
+    `, [workstation, shiftNumber, date]);
+    
+    if (rows[0]) {
+      return {
+        ...rows[0],
+        ignored: rows[0].ignored === 1,
+        bank_dropped: rows[0].bank_dropped === 1
+      };
+    }
+    return null;
+  },
+
+  delete: async (id) => {
+    await pool.execute(`DELETE FROM cash_drops WHERE id = ?`, [id]);
+    return true;
   }
 };

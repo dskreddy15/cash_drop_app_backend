@@ -3,7 +3,8 @@ import multer from 'multer';
 import {
   createCashDrop,
   getCashDrops,
-  ignoreCashDrop
+  ignoreCashDrop,
+  deleteCashDrop
 } from '../controllers/cashDropController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -23,5 +24,6 @@ router.use(authenticateToken);
 router.post('/', upload.single('label_image'), createCashDrop);
 router.get('/', getCashDrops);
 router.patch('/ignore', ignoreCashDrop);
+router.delete('/:id', deleteCashDrop);
 
 export default router;

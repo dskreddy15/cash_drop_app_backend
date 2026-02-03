@@ -118,5 +118,13 @@ export const CashDropReconciler = {
     values.push(id);
     await pool.execute(`UPDATE cash_drop_reconcilers SET ${fields.join(', ')} WHERE id = ?`, values);
     return CashDropReconciler.findById(id);
+  },
+
+  findByDropEntryId: async (dropEntryId) => {
+    const [rows] = await pool.execute(`
+      SELECT * FROM cash_drop_reconcilers WHERE drop_entry_id = ?
+    `, [dropEntryId]);
+    
+    return rows[0] || null;
   }
 };

@@ -1,7 +1,8 @@
 import express from 'express';
 import {
   createCashDrawer,
-  getCashDrawers
+  getCashDrawers,
+  deleteCashDrawer
 } from '../controllers/cashDrawerController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -11,5 +12,6 @@ router.use(authenticateToken);
 
 router.post('/', createCashDrawer);
 router.get('/', getCashDrawers);
+router.delete('/:id', deleteCashDrawer);
 
 export default router;
