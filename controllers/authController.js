@@ -51,22 +51,9 @@ export const login = async (req, res) => {
     
     const { accessToken, refreshToken } = generateTokens(user);
     
-    // Set HttpOnly cookies
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 1000 // 60 minutes (matches ACCESS_TOKEN_LIFETIME)
-    });
-    
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours (matches REFRESH_TOKEN_LIFETIME)
-    });
-    
     res.json({
+      access: accessToken,
+      refresh: refreshToken,
       is_admin: user.is_admin === 1
     });
   } catch (error) {
@@ -255,25 +242,12 @@ export const deleteUser = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  // Clear HttpOnly cookies
-  res.clearCookie('access_token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
-  });
-  
-  res.clearCookie('refresh_token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
-  });
-  
   res.json({ message: 'Logged out successfully' });
 };
 
 export const refreshToken = async (req, res) => {
   try {
-    const refreshToken = req.cookies?.refresh_token || req.body?.refresh;
+    const refreshToken = req.body?.refresh;
     
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token required' });
@@ -292,15 +266,7 @@ export const refreshToken = async (req, res) => {
       
       const { accessToken } = generateTokens(user);
       
-      // Set new access token in HttpOnly cookie
-      res.cookie('access_token', accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 1000 // 60 minutes
-      });
-      
-      res.json({ success: true });
+      res.json({ access: accessToken });
     });
   } catch (error) {
     console.error('Refresh token error:', error);

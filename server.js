@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -10,6 +9,7 @@ import cashDrawerRoutes from "./routes/cashDrawerRoutes.js";
 import cashDropRoutes from "./routes/cashDropRoutes.js";
 import cashDropReconcilerRoutes from "./routes/cashDropReconcilerRoutes.js";
 import bankDropRoutes from "./routes/bankDropRoutes.js";
+import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
 
 dotenv.config();
 
@@ -41,7 +41,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(cookieParser()); // Parse cookies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -54,6 +53,7 @@ app.use("/api/cash-drop-app1/cash-drawer", cashDrawerRoutes);
 app.use("/api/cash-drop-app1/cash-drop", cashDropRoutes);
 app.use("/api/cash-drop-app1/cash-drop-reconciler", cashDropReconcilerRoutes);
 app.use("/api/bank-drop", bankDropRoutes);
+app.use("/api/admin-settings", adminSettingsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

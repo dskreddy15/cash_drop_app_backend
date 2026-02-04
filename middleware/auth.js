@@ -3,8 +3,8 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'cbjdVCQVE;OCLQ CBMASBCVICVQOFQefkbkjwebv;w';
 
 export const authenticateToken = (req, res, next) => {
-  // Try to get token from HttpOnly cookie first, then fallback to Authorization header
-  const token = req.cookies?.access_token || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
