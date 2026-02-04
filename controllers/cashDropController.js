@@ -3,7 +3,6 @@ import { CashDropReconciler } from '../models/cashDropReconcilerModel.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { getPSTDateTime } from '../utils/dateUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,7 +69,7 @@ export const createCashDrop = async (req, res) => {
       req.body.date
     );
 
-    // If a non-ignored cash drop exists, return error
+    // If a non-ignored cash drop exists, return error (only for submitted cash drops, not drafts)
     if (existingDrop && !existingDrop.ignored && status !== 'drafted') {
       return res.status(400).json({ error: 'Cash drop entry already exists for this workstation, shift, and date' });
     }

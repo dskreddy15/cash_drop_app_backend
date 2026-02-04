@@ -10,7 +10,6 @@ import cashDrawerRoutes from "./routes/cashDrawerRoutes.js";
 import cashDropRoutes from "./routes/cashDropRoutes.js";
 import cashDropReconcilerRoutes from "./routes/cashDropReconcilerRoutes.js";
 import bankDropRoutes from "./routes/bankDropRoutes.js";
-import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
 
 dotenv.config();
 
@@ -33,6 +32,9 @@ const corsOptions = {
     }
     
     // In production, you should specify exact origins
+    if (origin.match(process.env.REACT_APP_URL)) {
+      return callback(null, true);
+    }
     callback(null, true); // For now, allow all origins in development
   },
   credentials: true
@@ -52,7 +54,6 @@ app.use("/api/cash-drop-app1/cash-drawer", cashDrawerRoutes);
 app.use("/api/cash-drop-app1/cash-drop", cashDropRoutes);
 app.use("/api/cash-drop-app1/cash-drop-reconciler", cashDropReconcilerRoutes);
 app.use("/api/bank-drop", bankDropRoutes);
-app.use("/api/admin-settings", adminSettingsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
