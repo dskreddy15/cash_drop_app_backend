@@ -8,8 +8,9 @@ export const CashDrop = {
         user_id, drawer_entry_id, workstation, shift_number, date,
         drop_amount, hundreds, fifties, twenties, tens, fives, twos, ones,
         half_dollars, quarters, dimes, nickels, pennies,
+        quarter_rolls, dime_rolls, nickel_rolls, penny_rolls,
         ws_label_amount, variance, label_image, notes, submitted_at, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       data.user_id,
       data.drawer_entry_id || null,
@@ -29,6 +30,10 @@ export const CashDrop = {
       data.dimes || 0,
       data.nickels || 0,
       data.pennies || 0,
+      data.quarter_rolls || 0,
+      data.dime_rolls || 0,
+      data.nickel_rolls || 0,
+      data.penny_rolls || 0,
       data.ws_label_amount || 0,
       data.variance || 0,
       data.label_image || null,
@@ -91,7 +96,8 @@ export const CashDrop = {
     
     // Update denominations
     const denominationFields = ['hundreds', 'fifties', 'twenties', 'tens', 'fives', 'twos', 'ones', 
-                                'half_dollars', 'quarters', 'dimes', 'nickels', 'pennies'];
+                                'half_dollars', 'quarters', 'dimes', 'nickels', 'pennies',
+                                'quarter_rolls', 'dime_rolls', 'nickel_rolls', 'penny_rolls'];
     
     denominationFields.forEach(field => {
       if (data[field] !== undefined) {
@@ -157,9 +163,24 @@ export const CashDrop = {
     return CashDrop.findById(id);
   },
 
-  delete: async (id) => {
-    const [result] = await pool.execute('DELETE FROM cash_drops WHERE id = ?', [id]);
-    return result.affectedRows > 0;
+  delete: async (id, retries = 3) => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const [result] = await pool.execute('DELETE FROM cash_drops WHERE id = ?', [id]);
+        return result.affectedRows > 0;
+      } catch (error) {
+        // If it's a deadlock and we have retries left, wait and retry
+        if (error.code === 'ER_LOCK_DEADLOCK' && attempt < retries - 1) {
+          // Wait a random amount of time (between 50-200ms) before retrying
+          const waitTime = Math.floor(Math.random() * 150) + 50;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        // If it's the last attempt or not a deadlock, throw the error
+        throw error;
+      }
+    }
+    return false;
   },
 
   findByWorkstationShiftDateStatus: async (workstation, shiftNumber, date, status = 'drafted') => {
@@ -201,10 +222,5 @@ export const CashDrop = {
       };
     }
     return null;
-  },
-
-  delete: async (id) => {
-    await pool.execute(`DELETE FROM cash_drops WHERE id = ?`, [id]);
-    return true;
   }
 };

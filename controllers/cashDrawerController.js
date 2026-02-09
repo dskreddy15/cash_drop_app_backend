@@ -33,6 +33,10 @@ export const createCashDrawer = async (req, res) => {
           dimes: req.body.dimes || 0,
           nickels: req.body.nickels || 0,
           pennies: req.body.pennies || 0,
+          quarter_rolls: req.body.quarter_rolls || 0,
+          dime_rolls: req.body.dime_rolls || 0,
+          nickel_rolls: req.body.nickel_rolls || 0,
+          penny_rolls: req.body.penny_rolls || 0,
           status: 'drafted'
         });
         return res.status(200).json(drawer);
@@ -60,6 +64,10 @@ export const createCashDrawer = async (req, res) => {
       dimes: req.body.dimes || 0,
       nickels: req.body.nickels || 0,
       pennies: req.body.pennies || 0,
+      quarter_rolls: req.body.quarter_rolls || 0,
+      dime_rolls: req.body.dime_rolls || 0,
+      nickel_rolls: req.body.nickel_rolls || 0,
+      penny_rolls: req.body.penny_rolls || 0,
       total_cash: req.body.total_cash,
       status: status
     };

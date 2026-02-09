@@ -6,8 +6,10 @@ export const CashDrawer = {
       INSERT INTO cash_drawers (
         user_id, workstation, shift_number, date, starting_cash,
         hundreds, fifties, twenties, tens, fives, twos, ones,
-        half_dollars, quarters, dimes, nickels, pennies, total_cash, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        half_dollars, quarters, dimes, nickels, pennies,
+        quarter_rolls, dime_rolls, nickel_rolls, penny_rolls,
+        total_cash, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       data.user_id,
       data.workstation,
@@ -26,6 +28,10 @@ export const CashDrawer = {
       data.dimes || 0,
       data.nickels || 0,
       data.pennies || 0,
+      data.quarter_rolls || 0,
+      data.dime_rolls || 0,
+      data.nickel_rolls || 0,
+      data.penny_rolls || 0,
       data.total_cash,
       data.status || 'submitted'
     ]);
@@ -120,9 +126,24 @@ export const CashDrawer = {
     return CashDrawer.findById(id);
   },
 
-  delete: async (id) => {
-    const [result] = await pool.execute('DELETE FROM cash_drawers WHERE id = ?', [id]);
-    return result.affectedRows > 0;
+  delete: async (id, retries = 3) => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const [result] = await pool.execute('DELETE FROM cash_drawers WHERE id = ?', [id]);
+        return result.affectedRows > 0;
+      } catch (error) {
+        // If it's a deadlock and we have retries left, wait and retry
+        if (error.code === 'ER_LOCK_DEADLOCK' && attempt < retries - 1) {
+          // Wait a random amount of time (between 50-200ms) before retrying
+          const waitTime = Math.floor(Math.random() * 150) + 50;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        // If it's the last attempt or not a deadlock, throw the error
+        throw error;
+      }
+    }
+    return false;
   },
 
   findByWorkstationShiftDateStatus: async (workstation, shiftNumber, date, status = 'drafted') => {

@@ -64,7 +64,7 @@ export const CashDropReconciler = {
       FROM cash_drop_reconcilers cdr
       JOIN cash_drops cd ON cdr.drop_entry_id = cd.id
       JOIN users u ON cd.user_id = u.id
-      WHERE cdr.date >= ? AND cdr.date <= ?
+      WHERE cdr.date >= ? AND cdr.date <= ? AND cd.status != 'drafted'
     `;
     
     const params = [dateFrom, dateTo];

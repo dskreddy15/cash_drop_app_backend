@@ -65,6 +65,10 @@ const initDatabase = async () => {
         dimes INT DEFAULT 0,
         nickels INT DEFAULT 0,
         pennies INT DEFAULT 0,
+        quarter_rolls INT DEFAULT 0,
+        dime_rolls INT DEFAULT 0,
+        nickel_rolls INT DEFAULT 0,
+        penny_rolls INT DEFAULT 0,
         total_cash DECIMAL(10, 2) NOT NULL,
         status ENUM('drafted', 'submitted', 'ignored') DEFAULT 'submitted',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -110,6 +114,10 @@ const initDatabase = async () => {
         dimes INT DEFAULT 0,
         nickels INT DEFAULT 0,
         pennies INT DEFAULT 0,
+        quarter_rolls INT DEFAULT 0,
+        dime_rolls INT DEFAULT 0,
+        nickel_rolls INT DEFAULT 0,
+        penny_rolls INT DEFAULT 0,
         ws_label_amount DECIMAL(10, 2) DEFAULT 0,
         variance DECIMAL(10, 2) DEFAULT 0,
         label_image VARCHAR(500),
@@ -236,6 +244,64 @@ const initDatabase = async () => {
       }
     } catch (e) {
       // Ignore errors
+    }
+
+    // Add roll columns to cash_drawers if they don't exist
+    try {
+      const [columns] = await connection.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = ? 
+        AND TABLE_NAME = 'cash_drawers' 
+        AND COLUMN_NAME IN ('quarter_rolls', 'dime_rolls', 'nickel_rolls', 'penny_rolls')
+      `, [dbConfig.database]);
+      
+      const existingColumns = columns.map(c => c.COLUMN_NAME);
+      
+      if (!existingColumns.includes('quarter_rolls')) {
+        await connection.query(`ALTER TABLE cash_drawers ADD COLUMN quarter_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('dime_rolls')) {
+        await connection.query(`ALTER TABLE cash_drawers ADD COLUMN dime_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('nickel_rolls')) {
+        await connection.query(`ALTER TABLE cash_drawers ADD COLUMN nickel_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('penny_rolls')) {
+        await connection.query(`ALTER TABLE cash_drawers ADD COLUMN penny_rolls INT DEFAULT 0`);
+      }
+      console.log('Added roll columns to cash_drawers table.');
+    } catch (e) {
+      console.error('Error adding roll columns to cash_drawers:', e.message);
+    }
+
+    // Add roll columns to cash_drops if they don't exist
+    try {
+      const [columns] = await connection.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = ? 
+        AND TABLE_NAME = 'cash_drops' 
+        AND COLUMN_NAME IN ('quarter_rolls', 'dime_rolls', 'nickel_rolls', 'penny_rolls')
+      `, [dbConfig.database]);
+      
+      const existingColumns = columns.map(c => c.COLUMN_NAME);
+      
+      if (!existingColumns.includes('quarter_rolls')) {
+        await connection.query(`ALTER TABLE cash_drops ADD COLUMN quarter_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('dime_rolls')) {
+        await connection.query(`ALTER TABLE cash_drops ADD COLUMN dime_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('nickel_rolls')) {
+        await connection.query(`ALTER TABLE cash_drops ADD COLUMN nickel_rolls INT DEFAULT 0`);
+      }
+      if (!existingColumns.includes('penny_rolls')) {
+        await connection.query(`ALTER TABLE cash_drops ADD COLUMN penny_rolls INT DEFAULT 0`);
+      }
+      console.log('Added roll columns to cash_drops table.');
+    } catch (e) {
+      console.error('Error adding roll columns to cash_drops:', e.message);
     }
 
     // Admin Settings table

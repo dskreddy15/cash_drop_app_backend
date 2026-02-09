@@ -3,6 +3,7 @@ import { CashDropReconciler } from '../models/cashDropReconcilerModel.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { getPSTDateTime } from '../utils/dateUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +52,10 @@ export const createCashDrop = async (req, res) => {
           dimes: req.body.dimes || 0,
           nickels: req.body.nickels || 0,
           pennies: req.body.pennies || 0,
+          quarter_rolls: req.body.quarter_rolls || 0,
+          dime_rolls: req.body.dime_rolls || 0,
+          nickel_rolls: req.body.nickel_rolls || 0,
+          penny_rolls: req.body.penny_rolls || 0,
           ws_label_amount: req.body.ws_label_amount || 0,
           variance: req.body.variance || 0,
           label_image: labelImagePath,
@@ -108,6 +113,10 @@ export const createCashDrop = async (req, res) => {
       dimes: req.body.dimes || 0,
       nickels: req.body.nickels || 0,
       pennies: req.body.pennies || 0,
+      quarter_rolls: req.body.quarter_rolls || 0,
+      dime_rolls: req.body.dime_rolls || 0,
+      nickel_rolls: req.body.nickel_rolls || 0,
+      penny_rolls: req.body.penny_rolls || 0,
       ws_label_amount: req.body.ws_label_amount || 0,
       variance: req.body.variance || 0,
       label_image: labelImagePath,
@@ -118,7 +127,7 @@ export const createCashDrop = async (req, res) => {
     
     const drop = await CashDrop.create(data);
     
-    // Auto-create reconciler entry only for submitted cash drops (not drafts)
+    // Auto-create reconciler entry only for submitted cash drops (not drafts or ignored)
     if (drop && drop.status === 'submitted' && !drop.ignored) {
       try {
         await CashDropReconciler.create({
@@ -133,6 +142,9 @@ export const createCashDrop = async (req, res) => {
         console.error('Error creating reconciler entry:', reconcilerError);
       }
     }
+    
+    // Note: Drafts are excluded from reconciliation/validation automatically since
+    // they have status='drafted' and the reconciler is only created for status='submitted'
     
     res.status(201).json(drop);
   } catch (error) {

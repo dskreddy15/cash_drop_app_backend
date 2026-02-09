@@ -7,11 +7,10 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication and admin access
-router.use(authenticateToken);
-router.use(requireAdmin);
+// GET endpoint - accessible to all authenticated users (needed for dropdowns)
+router.get('/', authenticateToken, getAdminSettings);
 
-router.get('/', getAdminSettings);
-router.put('/', updateAdminSettings);
+// PUT endpoint - requires admin access
+router.put('/', authenticateToken, requireAdmin, updateAdminSettings);
 
 export default router;
