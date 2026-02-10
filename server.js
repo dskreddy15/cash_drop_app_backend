@@ -19,6 +19,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8000; // Use the PORT environment variable from .env file
 
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
 // CORS configuration - Allow all localhost ports for development
 const corsOptions = {
   origin: function (origin, callback) {
@@ -65,10 +69,6 @@ app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
   console.error('Error stack:', err.stack);
   res.status(500).json({ error: err.message || 'Internal server error' });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
 });
 
 // Handle uncaught exceptions
