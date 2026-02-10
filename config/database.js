@@ -11,10 +11,10 @@ const __dirname = path.dirname(__filename);
 
 // MySQL connection configuration
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'dskreddy98',
-  database: process.env.DB_NAME || 'cash_drop_db',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

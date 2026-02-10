@@ -4,7 +4,7 @@ import { verify, generateSecret, generateURI } from 'otplib';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cbjdVCQVE;OCLQ CBMASBCVICVQOFQefkbkjwebv;w';
+const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TOKEN_LIFETIME = '60m';
 const REFRESH_TOKEN_LIFETIME = '1d';
 

@@ -1,5 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();
+
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,13 +13,13 @@ import cashDropReconcilerRoutes from "./routes/cashDropReconcilerRoutes.js";
 import bankDropRoutes from "./routes/bankDropRoutes.js";
 import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
 
-dotenv.config();
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT; // Use the PORT environment variable from .env file
 
 // CORS configuration - Allow all localhost ports for development
 const corsOptions = {
