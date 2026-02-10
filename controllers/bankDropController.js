@@ -149,7 +149,11 @@ export const getBankDropSummary = async (req, res) => {
       quarters: 0,
       dimes: 0,
       nickels: 0,
-      pennies: 0
+      pennies: 0,
+      quarter_rolls: 0,
+      dime_rolls: 0,
+      nickel_rolls: 0,
+      penny_rolls: 0
     };
     
     drops.forEach(drop => {
@@ -165,9 +169,17 @@ export const getBankDropSummary = async (req, res) => {
       totals.dimes += drop.dimes || 0;
       totals.nickels += drop.nickels || 0;
       totals.pennies += drop.pennies || 0;
+      totals.quarter_rolls += drop.quarter_rolls || 0;
+      totals.dime_rolls += drop.dime_rolls || 0;
+      totals.nickel_rolls += drop.nickel_rolls || 0;
+      totals.penny_rolls += drop.penny_rolls || 0;
     });
     
     // Calculate total amount
+    // Quarter rolls: 40 quarters each = $10 per roll
+    // Dime rolls: 50 dimes each = $5 per roll
+    // Nickel rolls: 40 nickels each = $2 per roll
+    // Penny rolls: 50 pennies each = $0.50 per roll
     const totalAmount = 
       totals.hundreds * 100 +
       totals.fifties * 50 +
@@ -180,7 +192,11 @@ export const getBankDropSummary = async (req, res) => {
       totals.quarters * 0.25 +
       totals.dimes * 0.1 +
       totals.nickels * 0.05 +
-      totals.pennies * 0.01;
+      totals.pennies * 0.01 +
+      totals.quarter_rolls * 10 +  // 40 quarters * $0.25 = $10 per roll
+      totals.dime_rolls * 5 +      // 50 dimes * $0.10 = $5 per roll
+      totals.nickel_rolls * 2 +    // 40 nickels * $0.05 = $2 per roll
+      totals.penny_rolls * 0.5;     // 50 pennies * $0.01 = $0.50 per roll
     
     res.json({
       cash_drops: drops,
