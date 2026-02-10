@@ -29,15 +29,19 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    if (NODE_ENV === 'development') {
     // Allow localhost on any port for development
-    if (origin.match(/^http:\/\/localhost:\d+$/) || 
-        origin.match(/^http:\/\/127\.0\.0\.1:\d+$/)) {
-      return callback(null, true);
+      if (origin.match(/^http:\/\/localhost:\d+$/) || 
+          origin.match(/^http:\/\/127\.0\.0\.1:\d+$/)) {
+        return callback(null, true);
+      }
     }
     
+    if (NODE_ENV === 'production') {
     // In production, you should specify exact origins
     if (origin.match(process.env.REACT_APP_URL)) {
       return callback(null, true);
+      }
     }
     callback(null, true); // For now, allow all origins in development
   },
