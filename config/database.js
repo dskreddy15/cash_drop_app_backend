@@ -9,24 +9,32 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// MySQL connection configuration
+// MySQL connection configuration - optimized for Hostinger shared hosting
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'dskreddy98',
   database: process.env.DB_NAME || 'cash_drop_db',
+  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 5, // Reduced for shared hosting
+  queueLimit: parseInt(process.env.DB_QUEUE_LIMIT) || 10, // Limited queue
+  acquireTimeout: 60000, // 60 seconds
+  timeout: 60000, // 60 seconds
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  reconnect: true,
+  // SSL configuration for Hostinger (if required)
+  ssl: process.env.DB_SSL === 'true' ? {
+    rejectUnauthorized: false
+  } : false
 };
 
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
 // Initialize database tables
-const initDatabase = async () => {
+export const initializeDatabase = async () => {
   let connection;
   try {
     connection = await pool.getConnection();
@@ -385,13 +393,19 @@ const initDatabase = async () => {
   }
 };
 
-// Initialize database on startup
-initDatabase().catch((error) => {
-  console.error('Database initialization error:', error);
-  console.error('Please ensure MySQL is running and the database exists.');
-  console.error('You can create the database with: CREATE DATABASE cash_drop_db;');
-  // Don't exit - let the server start and show the error
-});
+// Test database connection
+export const testConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    console.log('Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Database connection test failed:', error.message);
+    return false;
+  }
+};
 
 // Export pool for use in models
 export default pool;

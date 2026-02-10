@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import { initializeDatabase } from "./config/database.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import cashDrawerRoutes from "./routes/cashDrawerRoutes.js";
@@ -19,9 +20,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8000; // Use the PORT environment variable from .env file
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+// Track if database is ready
+let dbReady = false;
 
 // CORS configuration - Allow all localhost ports for development
 const corsOptions = {
@@ -59,9 +59,29 @@ app.use("/api/cash-drop-app1/cash-drop-reconciler", cashDropReconcilerRoutes);
 app.use("/api/bank-drop", bankDropRoutes);
 app.use("/api/admin-settings", adminSettingsRoutes);
 
-// Health check endpoint
+// Health check endpoint - includes database status
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ 
+    status: 'ok',
+    database: dbReady ? 'connected' : 'connecting',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Middleware to check database readiness (except for health endpoint)
+app.use((req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+  
+  if (!dbReady) {
+    return res.status(503).json({ 
+      error: 'Service temporarily unavailable. Database is initializing.',
+      retryAfter: 5
+    });
+  }
+  
+  next();
 });
 
 // Global error handler (must be after routes)
@@ -79,6 +99,42 @@ process.on('uncaughtException', (error) => {
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    console.log('Initializing database...');
+    await initializeDatabase();
+    dbReady = true;
+    console.log('Database initialized successfully');
+    
+    // Start server only after database is ready
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+    });
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    console.error('Server will not start without database connection.');
+    
+    // Exit with error code so process manager can restart
+    process.exit(1);
+  }
+};
+
+// Start the application
+startServer();
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  process.exit(0);
 });
 
 export default app;
