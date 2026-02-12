@@ -244,7 +244,19 @@ export const deleteCashDrop = async (req, res) => {
       return res.status(403).json({ error: 'You can only delete your own drafts' });
     }
     
+    const drawerId = drop.drawer_entry_id;
     const deleted = await CashDrop.delete(parseInt(id));
+    
+    if (deleted && drawerId) {
+      try {
+        const drawer = await CashDrawer.findById(drawerId);
+        if (drawer && drawer.status === 'drafted') {
+          await CashDrawer.delete(drawerId);
+        }
+      } catch (e) {
+        console.warn('Could not delete linked drawer draft:', e);
+      }
+    }
     
     if (deleted) {
       res.json({ message: 'Draft deleted successfully' });

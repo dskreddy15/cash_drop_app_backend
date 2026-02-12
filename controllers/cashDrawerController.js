@@ -1,4 +1,5 @@
 import { CashDrawer } from '../models/cashDrawerModel.js';
+import { CashDrop } from '../models/cashDropModel.js';
 
 export const createCashDrawer = async (req, res) => {
   try {
@@ -106,6 +107,16 @@ export const updateCashDrawer = async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: 'Cash drawer not found or update failed' });
     }
+    if (updateData.status === 'ignored') {
+      try {
+        const linkedDrop = await CashDrop.findByDrawerId(parseInt(id));
+        if (linkedDrop) {
+          await CashDrop.update(linkedDrop.id, { ignored: true, status: 'ignored', ignore_reason: 'Drawer ignored' });
+        }
+      } catch (e) {
+        console.warn('Could not update linked cash drop to ignored:', e);
+      }
+    }
     res.json(updated);
   } catch (error) {
     console.error('Update cash drawer error:', error);
@@ -127,15 +138,26 @@ export const deleteCashDrawer = async (req, res) => {
       return res.status(404).json({ error: 'Cash drawer not found' });
     }
     
+    // Only allow deletion of draft drawers
+    if (drawer.status !== 'drafted') {
+      return res.status(400).json({ error: 'Only draft drawers can be deleted' });
+    }
+    
     // Only allow users to delete their own drawers (unless admin)
     if (!req.user.is_admin && drawer.user_id !== req.user.id) {
       return res.status(403).json({ error: 'You can only delete your own cash drawers' });
     }
     
-    const deleted = await CashDrawer.delete(parseInt(id));
+    const drawerId = parseInt(id);
+    const linkedDrop = await CashDrop.findByDrawerId(drawerId);
+    if (linkedDrop && linkedDrop.status === 'drafted') {
+      await CashDrop.delete(linkedDrop.id);
+    }
+    
+    const deleted = await CashDrawer.delete(drawerId);
     
     if (deleted) {
-      res.json({ message: 'Cash drawer deleted successfully' });
+      res.json({ message: 'Draft deleted successfully' });
     } else {
       res.status(500).json({ error: 'Failed to delete cash drawer' });
     }

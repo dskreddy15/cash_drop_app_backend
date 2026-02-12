@@ -83,6 +83,20 @@ export const CashDrop = {
     }));
   },
 
+  findByDrawerId: async (drawerId) => {
+    const [rows] = await pool.execute(
+      'SELECT * FROM cash_drops WHERE drawer_entry_id = ? LIMIT 1',
+      [drawerId]
+    );
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      ...row,
+      ignored: row.ignored === 1,
+      bank_dropped: row.bank_dropped === 1
+    };
+  },
+
   findByBatchNumbers: async (batchNumbers) => {
     if (!batchNumbers || !Array.isArray(batchNumbers) || batchNumbers.length === 0) {
       return [];
