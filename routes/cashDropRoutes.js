@@ -6,7 +6,8 @@ import {
   getCashDropById,
   updateCashDrop,
   deleteCashDrop,
-  ignoreCashDrop
+  ignoreCashDrop,
+  validateCashDrop
 } from '../controllers/cashDropController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -23,6 +24,7 @@ const upload = multer({
 
 router.use(authenticateToken);
 
+router.post('/validate', validateCashDrop);
 router.post('/', upload.single('label_image'), createCashDrop);
 router.get('/', getCashDrops);
 router.get('/:id', getCashDropById);

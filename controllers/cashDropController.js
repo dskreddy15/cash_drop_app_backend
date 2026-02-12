@@ -24,12 +24,28 @@ export const createCashDrop = async (req, res) => {
     }
     
     const status = req.body.status || 'submitted';
+    const workstation = req.body.workstation;
+    const shift_number = req.body.shift_number;
+    const date = req.body.date;
+
+    // Block duplicate: one drop per (workstation, shift_number, date)
+    if (workstation != null && shift_number != null && date && status === 'submitted') {
+      const existing = await CashDrop.findByWorkstationShiftDate(workstation, shift_number, date, status);
+      if (existing && existing.user_name && status === 'submitted') {
+        const isOtherUser = existing.user_id !== req.user.id;
+        const message = isOtherUser
+          ? `Cash drop entry already submitted by ${existing.user_name} for this register, shift, and date.`
+          : 'A cash drop entry already exists for this register, shift, and date.';
+        return res.status(400).json({ error: message });
+      }
+    }
+
     const data = {
       user_id: req.user.id,
       drawer_entry_id: req.body.drawer_entry || req.body.drawer_entry_id || null,
-      workstation: req.body.workstation,
-      shift_number: req.body.shift_number,
-      date: req.body.date,
+      workstation,
+      shift_number,
+      date,
       drop_amount: req.body.drop_amount,
       hundreds: req.body.hundreds || 0,
       fifties: req.body.fifties || 0,
@@ -72,9 +88,53 @@ export const createCashDrop = async (req, res) => {
     res.status(201).json(drop);
   } catch (error) {
     if (error.message && error.message.includes('UNIQUE') || error.code === 'ER_DUP_ENTRY') {
+      const workstation = req.body.workstation;
+      const shiftNumber = req.body.shift_number || req.body.shiftNumber;
+      const date = req.body.date;
+      if (workstation && shiftNumber != null && date) {
+        try {
+          const existing = await CashDrop.findByWorkstationShiftDate(workstation, shiftNumber, date);
+          if (existing && existing.user_id !== req.user.id && existing.user_name) {
+            return res.status(400).json({
+              error: `Cash drop entry already done by ${existing.user_name} for this workstation, shift, and date.`
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch existing drop for error message:', e);
+        }
+      }
       return res.status(400).json({ error: 'Cash drop entry already exists for this workstation, shift, and date' });
     }
     console.error('Create cash drop error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/** Validate that a cash drop can be submitted (no duplicate for workstation/shift/date). Use before creating/updating drawer so drawer is only written when drop will succeed. */
+export const validateCashDrop = async (req, res) => {
+  try {
+    const workstation = req.body.workstation;
+    const shift_number = req.body.shift_number;
+    const date = req.body.date;
+    const draftId = req.body.draftId != null ? parseInt(req.body.draftId, 10) : null;
+
+    if (workstation == null || shift_number == null || !date) {
+      return res.status(400).json({ error: 'workstation, shift_number, and date are required.' });
+    }
+
+    const existing = await CashDrop.findByWorkstationShiftDate(workstation, shift_number, date);
+    if (!existing) {
+      return res.status(200).json({ ok: true });
+    }
+    if (draftId != null && existing.id === draftId) {
+      return res.status(200).json({ ok: true });
+    }
+    const message = existing.user_id !== req.user.id && existing.user_name
+      ? `Cash drop entry already submitted by ${existing.user_name} for this register, shift, and date.`
+      : 'A cash drop entry already exists for this register, shift, and date.';
+    return res.status(400).json({ error: message });
+  } catch (error) {
+    console.error('Validate cash drop error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -144,6 +204,27 @@ export const getCashDropById = async (req, res) => {
 export const updateCashDrop = async (req, res) => {
   try {
     const { id } = req.params;
+    const dropId = parseInt(id);
+    const currentDrop = await CashDrop.findById(dropId);
+    if (!currentDrop) {
+      return res.status(404).json({ error: 'Cash drop not found' });
+    }
+
+    // When submitting a draft: block if another drop already exists for same workstation/shift/date
+    if (req.body.status === 'submitted') {
+      const workstation = req.body.workstation || currentDrop.workstation;
+      const shiftNumber = req.body.shift_number || currentDrop.shift_number;
+      const date = req.body.date || currentDrop.date;
+      if (workstation != null && shiftNumber != null && date) {
+        const existing = await CashDrop.findByWorkstationShiftDate(workstation, shiftNumber, date);
+        if (existing && existing.id !== dropId && existing.user_name) {
+          return res.status(400).json({
+            error: `Cash drop entry already submitted by ${existing.user_name} for this register, shift, and date.`
+          });
+        }
+      }
+    }
+
     const updateData = {};
     
     // Handle file upload if present

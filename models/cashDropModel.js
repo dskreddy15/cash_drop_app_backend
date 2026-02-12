@@ -83,6 +83,23 @@ export const CashDrop = {
     }));
   },
 
+  /** Find a drop for (workstation, shift, date). Excludes ignored drops so a new drop can be submitted after ignoring. */
+  findByWorkstationShiftDate: async (workstation, shiftNumber, date) => {
+    const [rows] = await pool.execute(
+      `SELECT cd.*, u.name as user_name FROM cash_drops cd
+       JOIN users u ON cd.user_id = u.id
+       WHERE cd.workstation = ? AND cd.shift_number = ? AND cd.date = ? AND (cd.ignored = 0 OR cd.ignored IS NULL) LIMIT 1`,
+      [workstation, shiftNumber, date]
+    );
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      ...row,
+      ignored: row.ignored === 1,
+      bank_dropped: row.bank_dropped === 1
+    };
+  },
+
   findByDrawerId: async (drawerId) => {
     const [rows] = await pool.execute(
       'SELECT * FROM cash_drops WHERE drawer_entry_id = ? LIMIT 1',
