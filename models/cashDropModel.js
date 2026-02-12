@@ -83,6 +83,22 @@ export const CashDrop = {
     }));
   },
 
+  findByBatchNumbers: async (batchNumbers) => {
+    if (!batchNumbers || !Array.isArray(batchNumbers) || batchNumbers.length === 0) {
+      return [];
+    }
+    const placeholders = batchNumbers.map(() => '?').join(', ');
+    const [rows] = await pool.execute(
+      `SELECT * FROM cash_drops WHERE bank_drop_batch_number IN (${placeholders})`,
+      batchNumbers
+    );
+    return rows.map(row => ({
+      ...row,
+      ignored: row.ignored === 1,
+      bank_dropped: row.bank_dropped === 1
+    }));
+  },
+
   update: async (id, data) => {
     const fields = [];
     const values = [];
@@ -115,11 +131,14 @@ export const CashDrop = {
     if (data.bank_dropped !== undefined) {
       fields.push('bank_dropped = ?');
       values.push(data.bank_dropped ? 1 : 0);
-      // Update status to bank_dropped when bank_dropped is set to true
-      if (data.bank_dropped) {
-        fields.push('status = ?');
-        values.push('bank_dropped');
+      if (!data.bank_dropped) {
+        fields.push('bank_drop_batch_number = ?');
+        values.push(null);
       }
+    }
+    if (data.bank_drop_batch_number !== undefined) {
+      fields.push('bank_drop_batch_number = ?');
+      values.push(data.bank_drop_batch_number);
     }
     if (data.ignored !== undefined) {
       fields.push('ignored = ?');

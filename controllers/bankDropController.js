@@ -1,5 +1,17 @@
 import { CashDrop } from '../models/cashDropModel.js';
 import { CashDropReconciler } from '../models/cashDropReconcilerModel.js';
+import { BankDrop } from '../models/bankDropModel.js';
+
+// Get all dropped batches (for History section)
+export const getBatchHistory = async (req, res) => {
+  try {
+    const batches = await BankDrop.findAllBatchesWithAmount();
+    res.json(batches);
+  } catch (error) {
+    console.error('Get batch history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 // Get reconciled cash drops for bank drop (only reconciled ones)
 export const getBankDropData = async (req, res) => {
@@ -14,7 +26,7 @@ export const getBankDropData = async (req, res) => {
     // Only get reconciled items - use admin_count_amount (Counted Amount) for Bank Drop
     const reconcilers = await CashDropReconciler.findByDateRange(datefrom, dateto, userId, true);
     
-    // Add full URL for label images
+    // Add full URL for label images and ensure batch# is included
     const reconcilersWithImageUrl = reconcilers.map(reconciler => {
       const result = { ...reconciler };
       
@@ -25,12 +37,10 @@ export const getBankDropData = async (req, res) => {
         result.label_image_url = null;
       }
       
-      // Ensure drop_entry_id is included
       result.drop_entry_id = reconciler.drop_entry_id;
-      
-      // Use admin_count_amount (Counted Amount) for reconciled_amount in Bank Drop
       result.reconciled_amount = reconciler.admin_count_amount || reconciler.system_drop_amount;
-      
+      result.bank_drop_batch_number = reconciler.bank_drop_batch_number ?? null;
+      result.bank_dropped = !!reconciler.bank_dropped;
       return result;
     });
     
@@ -119,18 +129,20 @@ export const updateCashDropDenominations = async (req, res) => {
   }
 };
 
-// Get bank drop summary for selected cash drops
+// Get bank drop summary for selected cash drops or by batch number(s)
 export const getBankDropSummary = async (req, res) => {
   try {
-    const { cash_drop_ids } = req.body;
+    const { cash_drop_ids, batch_numbers } = req.body;
     
-    if (!cash_drop_ids || !Array.isArray(cash_drop_ids) || cash_drop_ids.length === 0) {
-      return res.status(400).json({ error: 'cash_drop_ids array is required' });
+    let drops = [];
+    if (batch_numbers && Array.isArray(batch_numbers) && batch_numbers.length > 0) {
+      drops = await CashDrop.findByBatchNumbers(batch_numbers);
+    } else if (cash_drop_ids && Array.isArray(cash_drop_ids) && cash_drop_ids.length > 0) {
+      const dropPromises = cash_drop_ids.map(id => CashDrop.findById(parseInt(id)));
+      drops = (await Promise.all(dropPromises)).filter(d => d !== null);
+    } else {
+      return res.status(400).json({ error: 'Either cash_drop_ids or batch_numbers array is required' });
     }
-    
-    // Get all cash drops
-    const dropPromises = cash_drop_ids.map(id => CashDrop.findById(parseInt(id)));
-    const drops = (await Promise.all(dropPromises)).filter(d => d !== null);
     
     if (drops.length === 0) {
       return res.status(404).json({ error: 'No valid cash drops found' });
@@ -194,35 +206,84 @@ export const getBankDropSummary = async (req, res) => {
   }
 };
 
-// Mark cash drops as bank dropped
+// Generate a unique batch number for bank drops
+function generateBankDropBatchNumber() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const h = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  return `BATCH-${y}${m}${d}-${h}${min}${s}`;
+}
+
+// Mark cash drops as bank dropped (assign same batch# to all in the request; optional custom batch_number)
 export const markAsBankDropped = async (req, res) => {
   try {
-    const { cash_drop_ids } = req.body;
+    const { cash_drop_ids, batch_number: customBatchNumber } = req.body;
     
     if (!cash_drop_ids || !Array.isArray(cash_drop_ids) || cash_drop_ids.length === 0) {
       return res.status(400).json({ error: 'cash_drop_ids array is required' });
     }
     
+    const batchNumber = (typeof customBatchNumber === 'string' && customBatchNumber.trim() !== '')
+      ? customBatchNumber.trim()
+      : generateBankDropBatchNumber();
     const updated = [];
+    const dropsWithAmount = []; // { id, drop_amount } for bank_drops table
     const errors = [];
     
     for (const id of cash_drop_ids) {
+      const numId = parseInt(id, 10);
+      if (Number.isNaN(numId) || numId < 1) {
+        errors.push({ id, error: 'Invalid cash drop id' });
+        continue;
+      }
       try {
-        const drop = await CashDrop.update(parseInt(id), { bank_dropped: true });
+        const drop = await CashDrop.update(numId, {
+          bank_dropped: true,
+          bank_drop_batch_number: batchNumber
+        });
         if (drop) {
           updated.push(drop.id);
+          const amount = drop.drop_amount != null ? parseFloat(drop.drop_amount) : 0;
+          dropsWithAmount.push({ id: drop.id, drop_amount: amount });
         } else {
           errors.push({ id, error: 'Cash drop not found' });
         }
       } catch (error) {
-        errors.push({ id, error: error.message });
+        console.error('Mark bank dropped update error for id', numId, error);
+        errors.push({ id: numId, error: error.message });
       }
     }
     
+    const batchDropAmount = dropsWithAmount.reduce((sum, d) => sum + d.drop_amount, 0);
+    
+    if (updated.length > 0) {
+      try {
+        await BankDrop.recordBatch(batchNumber, updated.length);
+      } catch (e) {
+        console.error('Failed to record bank_drop_batches:', e);
+      }
+      try {
+        await BankDrop.recordDrops(batchNumber, dropsWithAmount, batchDropAmount);
+      } catch (e) {
+        console.error('Failed to record bank_drops:', e);
+      }
+    }
+    
+    if (updated.length === 0) {
+      return res.status(400).json({
+        error: 'No cash drops were updated.',
+        errors: errors.length > 0 ? errors : undefined
+      });
+    }
     res.json({
       success: true,
       updated_count: updated.length,
       updated_ids: updated,
+      batch_number: batchNumber,
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {

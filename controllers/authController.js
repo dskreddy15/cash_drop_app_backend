@@ -276,11 +276,13 @@ export const refreshToken = async (req, res) => {
 };
 
 export const getUserCount = async (req, res) => {
+  console.log('[auth] GET /user-count requested');
   try {
     const count = await User.count();
+    console.log('[auth] User count:', count);
     res.json({ count });
   } catch (error) {
-    console.error('Get user count error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Get user count error:', error.message || error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };

@@ -4,6 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import pool, { initDatabase } from "./config/database.js";
 import authRoutes from "./routes/authRoutes.js";
 import cashDrawerRoutes from "./routes/cashDrawerRoutes.js";
 import cashDropRoutes from "./routes/cashDropRoutes.js";
@@ -52,9 +53,18 @@ app.use("/api/cash-drop-app1/cash-drop-reconciler", cashDropReconcilerRoutes);
 app.use("/api/bank-drop", bankDropRoutes);
 app.use("/api/admin-settings", adminSettingsRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+// Health check endpoint (includes database check)
+app.get('/health', async (req, res) => {
+  let dbStatus = 'unknown';
+  try {
+    const [rows] = await pool.execute('SELECT 1 as ok');
+    dbStatus = rows && rows[0] && rows[0].ok === 1 ? 'ok' : 'error';
+  } catch (err) {
+    dbStatus = 'error';
+    console.error('Health check DB error:', err.message);
+    return res.status(503).json({ status: 'error', database: 'error', message: err.message });
+  }
+  res.json({ status: 'ok', database: dbStatus });
 });
 
 // Global error handler (must be after routes)
@@ -64,9 +74,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await initDatabase();
+    console.log('Database: OK');
+  } catch (err) {
+    console.error('Database: FAILED -', err.message || err);
+    console.error('Ensure MySQL is running and .env has DB_HOST, DB_USER, DB_PASSWORD, DB_NAME.');
+    process.exit(1);
+  }
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
+}
+start();
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {

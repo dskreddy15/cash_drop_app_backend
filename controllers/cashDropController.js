@@ -1,5 +1,6 @@
 import { CashDrop } from '../models/cashDropModel.js';
 import { CashDropReconciler } from '../models/cashDropReconcilerModel.js';
+import { CashDrawer } from '../models/cashDrawerModel.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -278,7 +279,16 @@ export const ignoreCashDrop = async (req, res) => {
       ignore_reason: ignore_reason.trim(),
       status: 'ignored'
     });
-    
+
+    // When a cash drop is ignored, also set the linked cash drawer to ignored
+    if (drop.drawer_entry_id) {
+      try {
+        await CashDrawer.update(drop.drawer_entry_id, { status: 'ignored' });
+      } catch (drawerErr) {
+        console.warn('Could not update linked cash drawer to ignored:', drawerErr);
+      }
+    }
+
     res.json(updated);
   } catch (error) {
     console.error('Ignore cash drop error:', error);

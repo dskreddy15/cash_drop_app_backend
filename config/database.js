@@ -19,7 +19,8 @@ const dbConfig = {
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  connectTimeout: 10000,  // 10s - fail fast if DB unreachable
 };
 
 // Create connection pool
@@ -173,6 +174,31 @@ const initDatabase = async () => {
       // Ignore errors
     }
 
+    // Add bank_drop_batch_number to cash_drops if it doesn't exist
+    try {
+      const [cols] = await connection.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'cash_drops' AND COLUMN_NAME = 'bank_drop_batch_number'
+      `, [dbConfig.database]);
+      if (cols.length === 0) {
+        await connection.query(`
+          ALTER TABLE cash_drops ADD COLUMN bank_drop_batch_number VARCHAR(64) DEFAULT NULL
+        `);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    // Ensure cash_drops.status enum includes 'bank_dropped' and 'reconciled' (for existing DBs)
+    try {
+      await connection.query(`
+        ALTER TABLE cash_drops MODIFY COLUMN status
+        ENUM('drafted', 'submitted', 'ignored', 'bank_dropped', 'reconciled') DEFAULT 'submitted'
+      `);
+    } catch (e) {
+      // Ignore if column type is different or already correct
+    }
+
     // Add status column to cash_drawers if it doesn't exist
     try {
       const [columns] = await connection.query(`
@@ -228,6 +254,30 @@ const initDatabase = async () => {
         setting_value TEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Bank drop batches (audit / batch# details)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS bank_drop_batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_number VARCHAR(64) UNIQUE NOT NULL,
+        drop_count INT NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Bank drops: one row per cash drop in a batch (batch#, cash_drop_id, cash_drop_amount, batch_drop_amount)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS bank_drops (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_number VARCHAR(64) NOT NULL,
+        cash_drop_id INT NOT NULL,
+        cash_drop_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        batch_drop_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cash_drop_id) REFERENCES cash_drops(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_batch_cash_drop (batch_number, cash_drop_id)
       )
     `);
 
@@ -301,12 +351,8 @@ const initDatabase = async () => {
   }
 };
 
-// Initialize database on startup
-initDatabase().catch((error) => {
-  console.error('Database initialization error:', error);
-  console.error('Please ensure MySQL is running and the database exists.');
-  // Don't exit - let the server start and show the error
-});
+// Export for use in server.js (server calls initDatabase() before listening)
+export { initDatabase };
 
 // Export pool for use in models
 export default pool;

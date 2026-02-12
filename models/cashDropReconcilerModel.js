@@ -55,6 +55,7 @@ export const CashDropReconciler = {
         cd.variance,
         cd.label_image,
         cd.bank_dropped,
+        cd.bank_drop_batch_number,
         cd.notes,
         cd.ignored,
         cd.ignore_reason,
@@ -66,7 +67,9 @@ export const CashDropReconciler = {
       FROM cash_drop_reconcilers cdr
       JOIN cash_drops cd ON cdr.drop_entry_id = cd.id
       JOIN users u ON cd.user_id = u.id
-      WHERE cdr.date >= ? AND cdr.date <= ? AND (cd.ignored IS NULL OR cd.ignored = 0)
+      WHERE cdr.date >= ? AND cdr.date <= ?
+        AND (cd.ignored IS NULL OR cd.ignored = 0)
+        AND cd.status NOT IN ('drafted', 'ignored')
     `;
     
     const params = [dateFrom, dateTo];
