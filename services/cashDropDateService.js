@@ -6,7 +6,8 @@ import { isAllowedCashDropDateWithSettings } from '../utils/dateUtils.js';
 function parseSettings(raw) {
   return {
     cash_drop_date_range: raw.cash_drop_date_range || 'last_2_days',
-    cash_drop_only_before_bank_drop: raw.cash_drop_only_before_bank_drop === 'true'
+    // Always true: no cash drops for days where bank drop is done
+    cash_drop_only_before_bank_drop: true
   };
 }
 

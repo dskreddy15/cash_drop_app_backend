@@ -9,7 +9,8 @@ const parseSettings = (raw) => ({
   starting_amount: raw.starting_amount ? parseFloat(raw.starting_amount) : 200.00,
   max_cash_drops_per_day: raw.max_cash_drops_per_day ? parseInt(raw.max_cash_drops_per_day) : 10,
   cash_drop_date_range: raw.cash_drop_date_range || 'last_2_days',
-  cash_drop_only_before_bank_drop: raw.cash_drop_only_before_bank_drop === 'true' || raw.cash_drop_only_before_bank_drop === true
+  // Always true: customers cannot add cash drops for days where bank drop is already done
+  cash_drop_only_before_bank_drop: true
 });
 
 export const getAdminSettings = async (req, res) => {
@@ -24,7 +25,7 @@ export const getAdminSettings = async (req, res) => {
 
 export const updateAdminSettings = async (req, res) => {
   try {
-    const { shifts, workstations, starting_amount, max_cash_drops_per_day, cash_drop_date_range, cash_drop_only_before_bank_drop } = req.body;
+    const { shifts, workstations, starting_amount, max_cash_drops_per_day, cash_drop_date_range } = req.body;
 
     if (shifts) {
       await AdminSettings.set('shifts', JSON.stringify(shifts));
@@ -40,9 +41,6 @@ export const updateAdminSettings = async (req, res) => {
     }
     if (cash_drop_date_range !== undefined) {
       await AdminSettings.set('cash_drop_date_range', cash_drop_date_range === 'all_previous' ? 'all_previous' : 'last_2_days');
-    }
-    if (cash_drop_only_before_bank_drop !== undefined) {
-      await AdminSettings.set('cash_drop_only_before_bank_drop', cash_drop_only_before_bank_drop ? 'true' : 'false');
     }
 
     const updatedSettings = await AdminSettings.getAll();
