@@ -9,7 +9,8 @@ import {
   deleteUser,
   logout,
   refreshToken,
-  getUserCount
+  getUserCount,
+  regenerateAuthenticator
 } from '../controllers/authController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { User } from '../models/authModel.js';
@@ -43,5 +44,6 @@ router.post('/users', async (req, res, next) => {
 router.get('/users/:id', authenticateToken, requireAdmin, getUserById);
 router.put('/users/:id', authenticateToken, requireAdmin, updateUser);
 router.delete('/users/:id', authenticateToken, requireAdmin, deleteUser);
+router.post('/users/:id/regenerate-authenticator', authenticateToken, requireAdmin, regenerateAuthenticator);
 
 export default router;

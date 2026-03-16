@@ -287,3 +287,69 @@ export const getUserCount = async (req, res) => {
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
+
+/**
+ * Regenerate TOTP secret for a user (admin only).
+ * Returns new secret and QR code so the user can add the account to their authenticator again.
+ */
+export const regenerateAuthenticator = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let secret;
+    try {
+      secret = generateSecret();
+    } catch (secretError) {
+      console.error('Error generating secret:', secretError);
+      return res.status(500).json({ error: 'Failed to generate TOTP secret' });
+    }
+
+    await User.updateTotpSecret(userId, secret);
+
+    let otpAuthUrl;
+    try {
+      otpAuthUrl = generateURI({
+        secret,
+        label: user.email,
+        issuer: 'MFY CashDrop'
+      });
+    } catch (uriError) {
+      console.error('Error generating URI:', uriError);
+      return res.status(200).json({
+        secret,
+        qr_code: null,
+        message: 'Authenticator regenerated. Use the secret manually in Google Authenticator.'
+      });
+    }
+
+    let qrCodeDataUrl;
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+    } catch (qrError) {
+      console.error('Error generating QR code:', qrError);
+      return res.status(200).json({
+        secret,
+        qr_code: null,
+        message: 'Authenticator regenerated. QR code failed; use the secret manually in Google Authenticator.'
+      });
+    }
+
+    res.json({
+      secret,
+      qr_code: qrCodeDataUrl,
+      email: user.email,
+      name: user.name
+    });
+  } catch (error) {
+    console.error('Regenerate authenticator error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
