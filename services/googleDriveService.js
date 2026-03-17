@@ -1,6 +1,6 @@
 /**
  * Google Drive storage: upload images to Year/MonthName folder structure (e.g. 2026/March).
- * Image name format: {shift}_{workstation}_mmddyyyyhhmmss.ext (e.g. 1_Register1_02112026143022.png)
+ * Image name format: {shift}_{workstation}_mmddyyyy.ext (e.g. 1_Register1_02112026.png); mmddyyyy = cash drop date
  * Uses OAuth2: GOOGLE_DRIVE_ENABLED, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN.
  */
 
@@ -101,28 +101,28 @@ async function getOrCreateFolderPath(year, month, rootFolderId) {
 }
 
 /**
- * Build image name: {shift}_{workstation}_mmddyyyyhhmmss.ext
- * e.g. 1_Register1_02112026143022.png
+ * Build image name: {shift}_{workstation}_mmddyyyy.ext
+ * mmddyyyy is the cash drop date (the day the user is submitting for), not upload time.
+ * e.g. 1_Register1_02112026.png
  */
-function buildImageName(workstation, shiftNumber, extension = '.png') {
+function buildImageName(workstation, shiftNumber, dateStr, extension = '.png') {
   const safe = (v) => String(v ?? '').replace(/[\s/\\:*?"<>|]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'unknown';
   const shift = safe(shiftNumber);
   const ws = safe(workstation);
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const yyyy = now.getFullYear();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  const base = `${shift}_${ws}_${mm}${dd}${yyyy}${hh}${min}${ss}`;
+  const parts = (dateStr || '').split(/[-/]/);
+  const yyyy = parts[0] || '';
+  const m = parseInt(parts[1], 10) || 1;
+  const d = parseInt(parts[2], 10) || 1;
+  const mm = String(m).padStart(2, '0');
+  const dd = String(d).padStart(2, '0');
+  const base = `${shift}_${ws}_${mm}${dd}${yyyy}`;
   const ext = extension.startsWith('.') ? extension : '.' + extension;
   return base + ext;
 }
 
 /**
- * Upload image buffer to Drive at year/monthname folder with name {shift}_{workstation}_mmddyyyyhhmmss.ext.
- * dateStr: YYYY-MM-DD (used for path year/month). workstation, shiftNumber: for filename.
+ * Upload image buffer to Drive at year/monthname folder with name {shift}_{workstation}_mmddyyyy.ext.
+ * dateStr: YYYY-MM-DD cash drop date (used for path and for mmddyyyy in filename). workstation, shiftNumber: for filename.
  * Returns public view URL or null.
  */
 export async function uploadImageToDrive(buffer, dateStr, workstation, shiftNumber, originalFileName) {
@@ -150,7 +150,7 @@ export async function uploadImageToDrive(buffer, dateStr, workstation, shiftNumb
   }
   if (!folderId) return null;
 
-  const fileName = buildImageName(workstation, shiftNumber, ext);
+  const fileName = buildImageName(workstation, shiftNumber, dateStr, ext);
 
   try {
     const createRes = await d.files.create({

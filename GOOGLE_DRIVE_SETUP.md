@@ -47,7 +47,7 @@ Cash drop receipt images can be stored in Google Drive with folder structure **Y
 ## Folder and file layout
 
 - **Path**: `Year/MonthName` (e.g. `2026/March`). No day subfolder.
-- **File name**: `{shift}_{workstation}_mmddyyyyhhmmss.ext` (e.g. `1_Register1_02112026143022.png`). The date/time in the name is the upload moment (month, day, year, hour, minute, second).
+- **File name**: `{shift}_{workstation}_mmddyyyy.ext` (e.g. `1_Register1_02112026.png`). The date (mmddyyyy) is the **cash drop date** (the day the user is submitting for), not the upload time.
 
 Files are shared as “anyone with the link can view” so the app can display them.
 
