@@ -217,6 +217,10 @@ export const CashDrop = {
       fields.push('shift_number = ?');
       values.push(data.shift_number);
     }
+    if (data.drawer_entry_id !== undefined) {
+      fields.push('drawer_entry_id = ?');
+      values.push(data.drawer_entry_id);
+    }
     
     if (fields.length === 0) return null;
     

@@ -116,24 +116,30 @@ export const createCashDrop = async (req, res) => {
     };
     // Backend computes drop_amount from denominations so validation/bank drop always match
     data.drop_amount = computeDropAmountFromDenominations(data);
+    if (!Number.isFinite(data.drop_amount)) data.drop_amount = 0;
     const wsLabel = parseFloat(data.ws_label_amount) || 0;
     data.variance = Math.round((data.drop_amount - wsLabel) * 100) / 100;
+    if (!Number.isFinite(data.variance)) data.variance = 0;
 
     const drop = await CashDrop.create(data);
     
     // Auto-create reconciler entry only for submitted cash drops (not drafts)
     if (drop && status === 'submitted') {
-      try {
-        await CashDropReconciler.create({
-          user_id: drop.user_id,
-          drop_entry_id: drop.id,
-          workstation: drop.workstation,
-          shift_number: drop.shift_number,
-          date: drop.date
-        });
-      } catch (reconcilerError) {
-        // Log but don't fail the cash drop creation
-        console.error('Error creating reconciler entry:', reconcilerError);
+      const existingRec = await CashDropReconciler.findByDropEntryId(drop.id);
+      if (!existingRec) {
+        try {
+          await CashDropReconciler.create({
+            user_id: drop.user_id,
+            drop_entry_id: drop.id,
+            workstation: drop.workstation,
+            shift_number: drop.shift_number,
+            date: drop.date
+          });
+        } catch (reconcilerError) {
+          if (reconcilerError.code !== 'ER_DUP_ENTRY') {
+            console.error('Error creating reconciler entry:', reconcilerError);
+          }
+        }
       }
     }
     
@@ -158,7 +164,7 @@ export const createCashDrop = async (req, res) => {
       return res.status(400).json({ error: 'Cash drop entry already exists for this workstation, shift, and date' });
     }
     console.error('Create cash drop error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 };
 
@@ -297,6 +303,15 @@ export const updateCashDrop = async (req, res) => {
     if (req.body.date !== undefined) updateData.date = req.body.date;
     if (req.body.workstation !== undefined) updateData.workstation = req.body.workstation;
     if (req.body.shift_number !== undefined) updateData.shift_number = req.body.shift_number;
+    if (req.body.drawer_entry !== undefined || req.body.drawer_entry_id !== undefined) {
+      const raw = req.body.drawer_entry ?? req.body.drawer_entry_id;
+      if (raw === '' || raw === null || raw === undefined) {
+        updateData.drawer_entry_id = null;
+      } else {
+        const n = parseInt(raw, 10);
+        updateData.drawer_entry_id = Number.isFinite(n) ? n : null;
+      }
+    }
     
     // Handle file upload if present (Google Drive year/month/day or local fallback)
     if (req.file) {
@@ -396,16 +411,21 @@ export const updateCashDrop = async (req, res) => {
     
     // Auto-create reconciler entry if status changed to submitted
     if (req.body.status === 'submitted' && updated) {
-      try {
-        await CashDropReconciler.create({
-          user_id: updated.user_id,
-          drop_entry_id: updated.id,
-          workstation: updated.workstation,
-          shift_number: updated.shift_number,
-          date: updated.date
-        });
-      } catch (reconcilerError) {
-        console.error('Error creating reconciler entry:', reconcilerError);
+      const existingRec = await CashDropReconciler.findByDropEntryId(updated.id);
+      if (!existingRec) {
+        try {
+          await CashDropReconciler.create({
+            user_id: updated.user_id,
+            drop_entry_id: updated.id,
+            workstation: updated.workstation,
+            shift_number: updated.shift_number,
+            date: updated.date
+          });
+        } catch (reconcilerError) {
+          if (reconcilerError.code !== 'ER_DUP_ENTRY') {
+            console.error('Error creating reconciler entry:', reconcilerError);
+          }
+        }
       }
     }
     

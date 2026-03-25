@@ -17,6 +17,15 @@ export const CashDropReconciler = {
     return CashDropReconciler.findById(result.insertId);
   },
 
+  /** One reconciler row per cash drop (drop_entry_id is UNIQUE). */
+  findByDropEntryId: async (dropEntryId) => {
+    const [rows] = await pool.execute(
+      'SELECT id FROM cash_drop_reconcilers WHERE drop_entry_id = ? LIMIT 1',
+      [dropEntryId]
+    );
+    return rows[0] || null;
+  },
+
   findById: async (id) => {
     const [rows] = await pool.execute(`
       SELECT 
